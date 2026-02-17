@@ -4,6 +4,7 @@ import logging
 import signal
 import sys
 import time
+from datetime import date
 
 from config import (
     APP_NAME,
@@ -66,10 +67,28 @@ def main():
     warned_15 = False
     warned_2 = False
     was_running = False
+    limit_enforced_today = tracker.is_limit_reached()
+
+    if limit_enforced_today:
+        logger.info("App started with limit already reached (%.0fs). Blocking mode active.", tracker.get_total_seconds_today())
 
     try:
         while running:
             game_running = is_game_running()
+
+            # --- IMMEDIATE BLOCK: limit already reached, kill on sight ---
+            if game_running and limit_enforced_today:
+                logger.info("BLOCKED: Game launched after daily limit. Killing immediately.")
+                notify_limit_reached()
+                time.sleep(1)
+                kill_game()
+                logger.info("Game killed (post-limit launch attempt).")
+                was_running = False
+                # Stay in active polling to catch re-launch attempts
+                deadline = time.monotonic() + POLL_ACTIVE
+                while running and time.monotonic() < deadline:
+                    time.sleep(1)
+                continue
 
             # --- Rising edge: game just launched ---
             if game_running and not was_running:
@@ -109,10 +128,24 @@ def main():
                     kill_game()
                     tracker.end_session()
                     was_running = False
-                    logger.info("Game killed. Enforcement complete for today.")
+                    limit_enforced_today = True
+                    logger.info("Game killed. Limit enforced – blocking further launches today.")
 
-            # Adaptive polling
-            interval = POLL_ACTIVE if game_running else POLL_IDLE
+            # Check for midnight rollover to reset blocking
+            if limit_enforced_today and str(date.today()) != tracker._today:
+                tracker._check_midnight()
+                limit_enforced_today = False
+                warned_15 = False
+                warned_2 = False
+                logger.info("New day detected – limit reset, monitoring resumed.")
+
+            # Adaptive polling – stay active when blocking to catch re-launches fast
+            if limit_enforced_today:
+                interval = POLL_ACTIVE
+            elif game_running:
+                interval = POLL_ACTIVE
+            else:
+                interval = POLL_IDLE
 
             # Sleep in small increments so shutdown is responsive
             deadline = time.monotonic() + interval
