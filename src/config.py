@@ -4,8 +4,8 @@ import os
 import sys
 
 # --- Process Detection ---
-TARGET_PROCESSES = ["GTA5.exe", "PlayGTAV.exe"]
-KILL_PROCESSES = ["GTA5.exe", "PlayGTAV.exe", "GTAVLauncher.exe", "subprocess.exe"]
+TARGET_PROCESSES = ["GTA5.exe", "GTA5_Enhanced.exe", "PlayGTAV.exe"]
+KILL_PROCESSES = ["GTA5.exe", "GTA5_Enhanced.exe", "PlayGTAV.exe", "GTAVLauncher.exe", "subprocess.exe"]
 
 # --- Time Limits (seconds) ---
 DAILY_LIMIT_SECONDS = 7200          # 2 hours
